@@ -48,29 +48,46 @@ def pad(x, y):
     y = ['0'] + y
   return x, y
 
-
 def subquadratic_multiply(x, y):
-  x.binary_vec, y.binary_vec = pad(x.binary_vec, y.binary_vec)
+  return _subquadratic_multiply(x, y).decimal_val
 
-  if x.decimal_val <= 1 or y.decimal_val <= 1:
+def _subquadratic_multiply(x, y):
+  xvec = x.binary_vec
+  yvec = y.binary_vec
+  xvec, yvec = pad(xvec, yvec)
+
+  if x.decimal_val <= 1 and y.decimal_val <= 1:
     return BinaryNumber(x.decimal_val * y.decimal_val)
 
-  len_x = len(x.binary_vec)
+  # 4 recursive calls
+  x_left, x_right = split_number(xvec)
+  y_left, y_right = split_number(yvec)
+  # x_L * y_L
+  left_product = _subquadratic_multiply(x_left, y_left)
+  # x_R * y_R
+  right_product = _subquadratic_multiply(x_right, y_right)
+  # x_L + x_R
+  left_right_sum = BinaryNumber(x_left.decimal_val + x_right.decimal_val)
+  # y_L + y_R
+  right_left_sum = BinaryNumber(y_left.decimal_val + y_right.decimal_val)
 
-  xl, xr = split_number(x.binary_vec)
-  yl, yr = split_number(y.binary_vec)
+  # (x_L + x_R) * (y_L + y_R)
+  middle_term = _subquadratic_multiply(left_right_sum, right_left_sum)
 
-  xlyl = subquadratic_multiply(xl, yl)
-  xryr = subquadratic_multiply(xr, yr)
+  # (x_L + x_R) * (y_L + y_R) - (x_L * y_L) - (x_R * y_R)
+  middle_term_complete = BinaryNumber(middle_term.decimal_val -
+                                      left_product.decimal_val -
+                                      right_product.decimal_val)
 
-  xl_plus_xr_yl_plus_yr = subquadratic_multiply(
-      BinaryNumber(xl.decimal_val + xr.decimal_val),
-      BinaryNumber(yl.decimal_val + yr.decimal_val))
-  middle_term = BinaryNumber(xl_plus_xr_yl_plus_yr.decimal_val -
-                             xlyl.decimal_val - xryr.decimal_val)
-  return BinaryNumber(
-      bit_shift(xlyl, len_x).decimal_val +
-      bit_shift(middle_term, len_x // 2).decimal_val + xryr.decimal_val)
+  # 2^{n/2} ((x_L + x_R) * (y_L + y_R) - (x_L * y_L) - (x_R * y_R))
+  middle_term_shifted = bit_shift(middle_term_complete, len(xvec) // 2)
+
+  # 2^n (x_L * y_L)
+  left_product = bit_shift(left_product, len(xvec))
+
+  return BinaryNumber(left_product.decimal_val +
+                      middle_term_shifted.decimal_val +
+                      right_product.decimal_val)
 
 
 def time_multiply(x, y, f):
